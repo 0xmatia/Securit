@@ -4,8 +4,8 @@
 
 #define PAM_SM_AUTH
 
-int pam_sm_authenticate(pam_handle_t *pamh, int flags)
+PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-    printf("Works?\n");
+    printf("Thank me later boi\n");
     return PAM_SUCCESS;
 }
