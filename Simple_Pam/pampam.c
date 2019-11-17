@@ -1,11 +1,14 @@
+#define PAM_SM_PASSWORD
+#define PAM_SM_AUTH
+
 #include <security/pam_modules.h>
 #include <security/pam_appl.h>
+#include <security/pam_ext.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "jsmn.h"
 
-#define PAM_SM_AUTH
 #define CONFIG_LOCATION "/etc/pasten.conf" //location of the user data
 #define CONFIG_FILE_MAX_SIZE 4096
 #define MAX_CREDS_LENGTH 1024
@@ -15,23 +18,21 @@ static int jsoneq(const char *json, jsmntok_t *tok, const char *s);
 
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-    char* username = "";
-    char* password = "";
+    const char* username = NULL;
+    const char* password = NULL;
 
     pam_get_user(pamh, &username, NULL);
     pam_get_authtok(pamh, PAM_AUTHTOK, &password , NULL);
-    
+
     if (password == NULL || username == NULL)
         return PAM_CRED_ERR;
 
-    
     return verifyCreds(&username, &password);
 }
 
 int verifyCreds(char** username_in, char** password_in)
 {
     int result = PAM_AUTH_ERR;
-    int a = PAM_SUCCESS;
     char username[MAX_CREDS_LENGTH] = "";
     char password[MAX_CREDS_LENGTH] = "";
     jsmn_parser parser;
@@ -74,12 +75,14 @@ int verifyCreds(char** username_in, char** password_in)
     {
         if (jsoneq(data, &t[i], "username") == 0)
         {
+            memset(username, 0, sizeof(username));
             strncpy(username,
                     data + t[i + 1].start,
                     t[i + 1].end - t[i + 1].start);
         }
         else if (jsoneq(data, &t[i], "password") == 0)
         {
+            memset(password, 0, sizeof(password));
             strncpy(password,
                     data + t[i + 1].start,
                     t[i + 1].end - t[i + 1].start);
@@ -90,7 +93,6 @@ int verifyCreds(char** username_in, char** password_in)
             {
                 if (strncmp(password, *password_in, strlen(password)) == 0)
                 {
-                    printf("Lama?");
                     result = PAM_SUCCESS;
                 }
             }
@@ -100,7 +102,7 @@ int verifyCreds(char** username_in, char** password_in)
     free(data);
     fclose(dataP);
     printf("%d\n", result);
-    return PAM_SUCCESS;
+    return result;
 }
 
 //helper function
