@@ -7,16 +7,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <json-c/json.h>
+
 
 #define CONFIG_LOCATION "/etc/pasten.conf" //location of the user data
-#define CONFIG_FILE_MAX_SIZE 4096
-#define MAX_CREDS_LENGTH 1024
+#define CONFIG_FILE_MAX_SIZE 2048
 
 int verifyCreds(char** username, char** password);
 
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-    const char* username = NULL;
+    const char*  username = NULL;
     const char* password = NULL;
 
     pam_get_user(pamh, &username, NULL);
@@ -29,43 +30,39 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 }
 
 int verifyCreds(char** username_in, char** password_in)
-{
-    char username[MAX_CREDS_LENGTH] = "";
-    char password[MAX_CREDS_LENGTH] = "";
-    
+{   
+
+    char buffer[CONFIG_FILE_MAX_SIZE] = "";
+    size_t numOfCreds = 0;
+
     //Read the file first:
     FILE *dataP = fopen(CONFIG_LOCATION, "r");
-    __ssize_t read = 0;
-    size_t len = 0;
-    char* line = NULL;
-
     if (!dataP)
         return PAM_SYSTEM_ERR;
-    while ((read = getline(&line, &len, dataP)) != -1) {
-        int del = (int)(strchr(line, ':') -line);
-        memcpy(username, line, del);
-        memcpy(password, &line[del+1], strlen(line) - strlen(username));
-        password[strlen(password)-1] = 0; //remove enter
 
-        //check:
-        if (!strcmp(username, *username_in))
+    fread(buffer, CONFIG_FILE_MAX_SIZE, 1, dataP);
+    fclose(dataP); //close file only if opened
+
+    //parse the json:
+    struct json_object *parsed_json;
+    parsed_json = json_tokener_parse(buffer);
+    numOfCreds = json_object_array_length(parsed_json);
+    for (size_t i = 0; i < numOfCreds; i++)
+    {
+        struct json_object* cred = json_object_array_get_idx(parsed_json, i);
+        struct json_object* username_json;
+        struct json_object* password_json;
+        json_object_object_get_ex(cred, "username", &username_json);
+        json_object_object_get_ex(cred, "password", &password_json);
+
+        if (!strcmp(json_object_get_string(username_json), *username_in))
         {
-            if (!strcmp(password, *password_in))
+            if (!strcmp(json_object_get_string(password_json), *password_in))
             {
-                //printf("%s\n", *username_in);
-                //printf("%s\n", *password_in);
                 return PAM_SUCCESS;
             }
             
         }
-        memset(username, 0, MAX_CREDS_LENGTH);
-        memset(password, 0, MAX_CREDS_LENGTH);
     }
-    
-    if (line)
-    {
-        free(line);
-    }
-    fclose(dataP);
-    return PAM_AUTH_ERR;
+        return PAM_AUTH_ERR;
 }
