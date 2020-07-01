@@ -1,2 +1,2 @@
 PAM instruction: auth sufficient /path/to/.so/file
-    my command: auth sufficient /home/syberman/Documents/Securit/Simple_Pam/bin/pampam.so
+    my command: auth sufficient /home/fl3rk3n/Documents/Securit/Simple_Pam/bin/pampam.so
